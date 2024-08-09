@@ -4,7 +4,7 @@
 
 <h1><img src="images/hugo-pumpkin.png" alt="The pumpkin breaks open to reveal" /></h1>
 
-![Release Badge](https://img.shields.io/badge/release-0.1-blue)
+![Release Badge](https://img.shields.io/badge/release-0.2-blue)
 ![License Badge](https://img.shields.io/badge/license-MIT-green)
 ![C Badge](https://img.shields.io/badge/language-C-purple)
 ![SDL Badge](https://img.shields.io/badge/library-SDL-pink)
@@ -31,9 +31,8 @@ I have tested this with Hugo 1 assets, but have not tested it with Hugo 2 or Hug
 
 ## 🦇 Getting Started 🦇
 
-1. In `constants.h` point `DEFAULT_DATA_FOLDER` to your Hugo installation (game not included)
-1. In `constants.h` set `DEFAULT_FILE` to the asset you want to view (see list of assets in `data.h`)
-3. Compile and run the project
+1. In `config\hugo.config` point the `data_folder` and `file` settings to your Hugo installation (game not included) and asset file you want to open
+2. Compile and run the project
 
 ## 🌙 Prerequisites 🌙
 
@@ -93,7 +92,7 @@ Check `hugo-unpacker.vcxproj` for full details.
 
 Future versions (if they happen) might include:
 
-- [ ] Enhanced viewer with a proper browser (no more modifying source to change assets)
+- [ ] Enhanced viewer with a proper browser (no more modifying config files to change assets)
 - [ ] Export functionality
 - [ ] Support for background and sprite assets (.art and .pix files), including animations
 - [ ] Proper cross-platform support

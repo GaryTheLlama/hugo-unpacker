@@ -6,6 +6,7 @@
 #include "constants.h"
 #include "data.h"
 #include "utils.h"
+#include "config.h"
 
 static SDL_Window* window = NULL;
 static SDL_Renderer* renderer = NULL;
@@ -61,10 +62,43 @@ int main(int argc, char* argv[])
 		return EXIT_FAILURE;
 	}
 
-	char fullPath[FULL_PATH_SIZE];
-	char* dataFolder = DEFAULT_DATA_FOLDER;
-	char* filename = DEFAULT_FILE;
-	snprintf(fullPath, sizeof(fullPath), "%s/%s", dataFolder, filename);
+	int kvsCount = 0;
+	static char* configFile = "config/hugo.config";
+	KeyValue* kvs = readConfig(configFile, &kvsCount);
+	
+	if (!kvs)
+	{
+		showError(window, "Error", "Error reading configuration file %s.\n", configFile);
+		shutdownSDL();
+		return EXIT_FAILURE;
+	}
+
+	char* dataFolder = getValue(kvs, kvsCount, "data_folder");
+	char* fileToOpen = getValue(kvs, kvsCount, "file");
+
+	if (!dataFolder || !fileToOpen)
+	{
+		showError(window, "Error", "Missing required config values.\n");
+		free(kvs);
+		shutdownSDL();
+		return EXIT_FAILURE;
+	}
+
+	free(kvs);
+
+	char fullPath[FULL_PATH_SIZE] = { 0 };
+	int n = snprintf(fullPath, sizeof(fullPath), "%s/%s", dataFolder, fileToOpen);
+
+	if (n < 0 || n >= sizeof(fullPath)) {
+		showError(window, "Error", "Buffer overflow while constructing full path.\n");
+		free(dataFolder);
+		free(fileToOpen);
+		shutdownSDL();
+		return EXIT_FAILURE;
+	}
+
+	free(dataFolder);
+	free(fileToOpen);
 
 	FILE* file = fopen(fullPath, "rb");
 

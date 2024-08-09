@@ -116,7 +116,8 @@
     </Link>
     <PostBuildEvent>
       <Command>copy "$(ProjectDir)lib\SDL2-2.30.6-dev\lib\x64\SDL2.dll" "$(OutDir)"
-</Command>
+if not exist "$(OutDir)config" mkdir "$(OutDir)config"
+copy "$(ProjectDir)config\hugo.config" "$(OutDir)config"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -139,19 +140,24 @@
     </Link>
     <PostBuildEvent>
       <Command>copy "$(ProjectDir)lib\SDL2-2.30.6" "$(OutDir)"
+if not exist "$(OutDir)config" mkdir "$(OutDir)config"
+copy "$(ProjectDir)config\hugo.config" "$(OutDir)config"
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\config.c" />
     <ClCompile Include="src\utils.c" />
     <ClCompile Include="src\main.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\config.h" />
     <ClInclude Include="include\data.h" />
     <ClInclude Include="include\constants.h" />
     <ClInclude Include="include\utils.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="HISTORY.md" />
     <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
