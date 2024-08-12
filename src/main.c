@@ -20,20 +20,29 @@ static int initSDL(void)
 		return EXIT_FAILURE;
 	}
 
-	if (SDL_CreateWindowAndRenderer(
+	window = SDL_CreateWindow(GET_TITLE(TITLE, VERSION),
+		SDL_WINDOWPOS_CENTERED,
+		SDL_WINDOWPOS_CENTERED,
 		WINDOW_WIDTH,
 		WINDOW_HEIGHT,
-		SDL_WINDOW_SHOWN | SDL_RENDERER_ACCELERATED,
-		&window,
-		&renderer))
+		0
+	);
+
+	if (!window)
 	{
-		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Error creating window and renderer: %s\n", SDL_GetError());
-		showError(window, "Error", "Error creating window and renderer.\n%s\n", SDL_GetError());
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Error creating window: %s\n", SDL_GetError());
+		showError(window, "Error", "Error creating window.\n%s\n", SDL_GetError());
 		return EXIT_FAILURE;
 	}
 
-	SDL_SetWindowTitle(window, GET_TITLE(TITLE, VERSION));
-	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+	renderer = SDL_CreateRenderer(window, -1, 0);
+
+	if (!renderer)
+	{
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Error creating renderer: %s\n", SDL_GetError());
+		showError(window, "Error", "Error creating renderer.\n%s\n", SDL_GetError());
+		return EXIT_FAILURE;
+	}
 
 	return 0;
 }
