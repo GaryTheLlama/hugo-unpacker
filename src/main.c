@@ -35,7 +35,7 @@ static int initSDL(void)
 		return EXIT_FAILURE;
 	}
 
-	renderer = SDL_CreateRenderer(window, -1, 0);
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
 
 	if (!renderer)
 	{
