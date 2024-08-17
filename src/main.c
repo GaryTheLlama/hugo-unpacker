@@ -8,8 +8,11 @@
 #include "utils.h"
 #include "config.h"
 
+int applicationIsRunning = 0;
+
 static SDL_Window* window = NULL;
 static SDL_Renderer* renderer = NULL;
+static SDL_Texture* texture = NULL;
 
 static int initSDL(void)
 {
@@ -60,6 +63,39 @@ static void shutdownSDL(void)
 	}
 
 	SDL_Quit();
+}
+
+static void handleInput(void)
+{
+	SDL_Event event;
+	SDL_PollEvent(&event);
+	
+	switch (event.type)
+	{
+		case SDL_KEYDOWN:
+			if (event.key.keysym.sym == SDLK_ESCAPE)
+			{
+				applicationIsRunning = 0;
+			}
+			break;
+		case SDL_QUIT:
+			applicationIsRunning = 0;
+			break;
+	}
+}
+
+static void update()
+{
+}
+
+static void render()
+{
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+	SDL_RenderClear(renderer);
+
+	SDL_RenderCopy(renderer, texture, NULL, NULL);
+
+	SDL_RenderPresent(renderer);
 }
 
 int main(int argc, char* argv[])
@@ -151,7 +187,7 @@ int main(int argc, char* argv[])
 	// Close the file, it's in memory we're done with it.
 	fclose(file);
 
-	SDL_Texture* texture = SDL_CreateTexture(
+	texture = SDL_CreateTexture(
 		renderer,
 		SDL_PIXELFORMAT_RGBA8888,
 		SDL_TEXTUREACCESS_STREAMING,
@@ -202,22 +238,13 @@ int main(int argc, char* argv[])
 	
 	SDL_UpdateTexture(texture, NULL, pixels, IMAGE_WIDTH * sizeof(uint32_t));
 	
-	int quit = 0;
-	SDL_Event event;
+	applicationIsRunning = 1;
 
-	while (!quit)
+	while (applicationIsRunning)
 	{
-		while (SDL_PollEvent(&event) != 0)
-		{
-			if (event.type == SDL_QUIT)
-			{
-				quit = 1;
-			}
-		}
-
-		SDL_RenderClear(renderer);
-		SDL_RenderCopy(renderer, texture, NULL, NULL);
-		SDL_RenderPresent(renderer);
+		handleInput();
+		update();
+		render();
 	}
 
 	free(buffer);
@@ -225,6 +252,7 @@ int main(int argc, char* argv[])
 
 	SDL_DestroyTexture(texture);
 	shutdownSDL();
+	applicationIsRunning = 0;
 
 	return 0;
 }

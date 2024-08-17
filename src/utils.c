@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-#include "SDL.h"
 #include "utils.h"
 
 void showError(SDL_Window* window, const char* title, const char* details, ...)
