@@ -147,6 +147,7 @@ copy "$(ProjectDir)config\hugo.config" "$(OutDir)config"
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\config.c" />
+    <ClCompile Include="src\data.c" />
     <ClCompile Include="src\utils.c" />
     <ClCompile Include="src\main.c" />
   </ItemGroup>
