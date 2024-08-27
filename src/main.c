@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <Windows.h>
 
 #include "SDL.h"
 #include "constants.h"
@@ -8,11 +9,21 @@
 #include "utils.h"
 #include "config.h"
 
-int applicationIsRunning = 0;
+uint8_t applicationIsRunning = 0;
+
+uint32_t lastFrameTime = 0;
+uint32_t currentImageIndex = 0;
+uint32_t totalFileCount = 0;
 
 static SDL_Window* window = NULL;
 static SDL_Renderer* renderer = NULL;
 static SDL_Texture* texture = NULL;
+
+typedef struct {
+	char* filename;
+	char* data;
+	long size;
+} File;
 
 static int initSDL(void)
 {
@@ -56,7 +67,7 @@ static void shutdownSDL(void)
 	{
 		SDL_DestroyRenderer(renderer);
 	}
-	
+
 	if (window)
 	{
 		SDL_DestroyWindow(window);
@@ -65,7 +76,135 @@ static void shutdownSDL(void)
 	SDL_Quit();
 }
 
-static void handleInput(void)
+static File* readFile(const char* filename)
+{
+	FILE* file = fopen(filename, "rb");
+
+	if (!file)
+	{
+		showError(window, "Error", "Error opening file %s.\n", filename);
+		shutdownSDL();
+		return NULL;
+	}
+
+	// Determine file size.
+	fseek(file, 0, SEEK_END);
+	long fileSize = ftell(file);
+	fseek(file, 0, SEEK_SET);
+
+	// Allocate memory to store file data.
+	uint8_t* data = (uint8_t*)malloc(fileSize);
+
+	if (!data)
+	{
+		showError(window, "Error", "Memory allocation failed.\n");
+		fclose(file);
+		free(data);
+		shutdownSDL();
+		return NULL;
+	}
+
+	if (fread(data, sizeof(uint8_t), fileSize, file) != fileSize)
+	{
+		showError(window, "Error", "Failed to write file into memory.\n");
+		fclose(file);
+		free(data);
+		shutdownSDL();
+		return NULL;
+	}
+
+	// Close the file, it's in memory we're done with it.
+	fclose(file);
+
+	File* f = (File*)malloc(sizeof(File));
+
+	if (!f)
+	{
+		showError(window, "Error", "Memory allocation failed.\n");
+		free(data);
+		shutdownSDL();
+		return NULL;
+	}
+
+	if (!filename)
+	{
+		showError(window, "Error", "Filename is null.\n");
+		free(data);
+		shutdownSDL();
+		return NULL;
+	}
+
+	f->filename = (char*)filename;
+	f->data = data;
+	f->size = fileSize;
+
+	return f;
+}
+
+static void loadImage(File* file, uint32_t* pixels)
+{
+	// Get the first byte.
+	uint8_t* b = file->data;
+
+	for (int y = 0; y < IMAGE_HEIGHT; y++)
+	{
+		for (int x = 0; x < IMAGE_WIDTH / 8; x++)
+		{
+			// Get byte so we can figure out the bits.
+			uint8_t currentByte = *b++;
+
+			// Decode the bits.
+			for (int i = 7; i >= 0; i--)
+			{
+				// Extract the current bit.
+				int currentBit = (currentByte >> i) & 0x01;
+				uint32_t color = currentBit ? COLOR_WHITE : COLOR_BLACK;
+
+				// y * WINDOW_WIDTH gives us the starting index for each row.
+				// x * 8 calculates the offset within the current row to the beginning of a group of 8 pixels
+				// that the current byte represents.
+				// (7 - i) calculates the position of a specific pixel within the 8-pixel group.
+				// (7 - i) inverts the bit order so that most significant bit (7) is the leftmost pixel and least (0)
+				// is the rightmost pixel.
+
+				int pixelIndexInRow = x * 8 + (7 - i);
+				int pixelIndex = y * IMAGE_WIDTH + pixelIndexInRow;
+				pixels[pixelIndex] = color;
+			}
+		}
+	}
+
+	SDL_UpdateTexture(texture, NULL, pixels, IMAGE_WIDTH * sizeof(uint32_t));
+}
+
+static void getNextImage(File** files, uint32_t* pixels)
+{
+	if (currentImageIndex == totalFileCount - 1) {
+		currentImageIndex = 0;
+	}
+	else
+	{
+		currentImageIndex++;
+	}
+
+	loadImage(files[currentImageIndex], pixels);
+}
+
+static void getPreviousImage(File** files, uint32_t* pixels)
+{
+	if (currentImageIndex == 0) {
+		currentImageIndex = totalFileCount - 1;
+	}
+	else
+	{
+		currentImageIndex--;
+	}
+
+	loadImage(files[currentImageIndex], pixels);
+}
+
+// TODO: This function should probably not receive these arguments.
+static void handleInput(File** files, uint32_t* pixels)
 {
 	SDL_Event event;
 	SDL_PollEvent(&event);
@@ -77,6 +216,20 @@ static void handleInput(void)
 			{
 				applicationIsRunning = 0;
 			}
+			if (event.key.keysym.sym == SDLK_LEFT)
+			{
+				getPreviousImage(files, pixels);
+			}
+			if (event.key.keysym.sym == SDLK_RIGHT)
+			{
+				getNextImage(files, pixels);
+			}
+			break;
+		case SDL_MOUSEBUTTONDOWN:
+			if (event.button.button == 1)
+			{
+				getNextImage(files, pixels);
+			}
 			break;
 		case SDL_QUIT:
 			applicationIsRunning = 0;
@@ -84,11 +237,16 @@ static void handleInput(void)
 	}
 }
 
-static void update()
+static void update(void)
 {
+	while (!SDL_TICKS_PASSED(SDL_GetTicks(), lastFrameTime + TARGET_FRAME_TIME));
+
+	lastFrameTime = SDL_GetTicks();
+
+	// TODO: Do any updates here.
 }
 
-static void render()
+static void render(void)
 {
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 	SDL_RenderClear(renderer);
@@ -130,62 +288,63 @@ int main(int argc, char* argv[])
 	}
 
 	free(kvs);
+	free(fileToOpen);
 
-	char fullPath[FULL_PATH_SIZE] = { 0 };
-	int n = snprintf(fullPath, sizeof(fullPath), "%s/%s", dataFolder, fileToOpen);
+	int fileCount;
+	char** filenames = getFilenames(&fileCount);
 
-	if (n < 0 || n >= sizeof(fullPath)) {
-		showError(window, "Error", "Buffer overflow while constructing full path.\n");
-		free(dataFolder);
-		free(fileToOpen);
+	totalFileCount = fileCount;
+
+	if (!filenames)
+	{
+		showError(window, "Error", "filesnames is null.\n");
 		shutdownSDL();
 		return EXIT_FAILURE;
+	}
+
+	File** files = (File**)malloc(sizeof(File*) * fileCount);
+
+	if (!files)
+	{
+		showError(window, "Error", "Memory allocation failed.\n");
+		shutdownSDL();
+		return EXIT_FAILURE;
+	}
+
+	for (int i = 0; i < fileCount; i++)
+	{
+		char fullPath[FULL_PATH_SIZE] = {0};
+		int n = snprintf(fullPath, sizeof(fullPath), "%s/%s", dataFolder, filenames[i]);
+
+		if (n < 0 || n >= sizeof(fullPath)) {
+			showError(window, "Error", "Buffer overflow while constructing full path.\n");
+			free(dataFolder);
+			shutdownSDL();
+			return EXIT_FAILURE;
+		}
+
+		files[i] = readFile(fullPath);
+
+		if (!files)
+		{
+			showError(window, "Error", "files is null.\n");
+			free(dataFolder);
+			shutdownSDL();
+			return EXIT_FAILURE;
+		}
 	}
 
 	free(dataFolder);
-	free(fileToOpen);
 
-	FILE* file = fopen(fullPath, "rb");
+	uint32_t* pixels = (uint32_t*)malloc(IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(uint32_t));
 
-	if (!file)
-	{
-		showError(window, "Error", "Error opening file %s.\n", fullPath);
-		shutdownSDL();
-		return EXIT_FAILURE;
-	}
-
-	// Determine file size.
-	fseek(file, 0, SEEK_END);
-	long fileSize = ftell(file);
-	fseek(file, 0, SEEK_SET);
-
-	// Allocate memory to store file contents and texture's pixel data.
-	uint8_t* buffer = malloc(fileSize * sizeof(uint8_t));
-	uint32_t* pixels = malloc(IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(uint32_t));
-	
-	if (!buffer || !pixels)
+	if (!pixels)
 	{
 		showError(window, "Error", "Memory allocation failed.\n");
-		fclose(file);
-		free(buffer);
 		free(pixels);
 		shutdownSDL();
 		return EXIT_FAILURE;
 	}
-
-	// Copy the bytes from the file into memory.
-	if (fread(buffer, sizeof(uint8_t), fileSize, file) != fileSize)
-	{
-		showError(window, "Error", "Failed to write file into memory.\n");
-		fclose(file);
-		free(buffer);
-		free(pixels);
-		shutdownSDL();
-		return EXIT_FAILURE;
-	}
-
-	// Close the file, it's in memory we're done with it.
-	fclose(file);
 
 	texture = SDL_CreateTexture(
 		renderer,
@@ -199,56 +358,33 @@ int main(int argc, char* argv[])
 	{
 		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Error creating texture: %s\n", SDL_GetError());
 		showError(window, "Error", "Error creating texture.\n%s\n", SDL_GetError());
-		free(buffer);
 		free(pixels);
 		shutdownSDL();
 		return EXIT_FAILURE;
 	}
-
-	// Get the first byte.
-	uint8_t* b = buffer;
-
-	for (int y = 0; y < IMAGE_HEIGHT; y++)
-	{
-		for (int x = 0; x < IMAGE_WIDTH / 8; x++)
-		{
-			// Get byte so we can figure out the bits.
-			uint8_t currentByte = *b++;
-
-			// Decode the bits.
-			for (int i = 7; i >= 0; i--)
-			{
-				// Extract the current bit.
-				int currentBit = (currentByte >> i) & 0x01;
-				uint32_t color = currentBit ? COLOR_WHITE : COLOR_BLACK;
-				
-				// y * WINDOW_WIDTH gives us the starting index for each row.
-				// x * 8 calculates the offset within the current row to the beginning of a group of 8 pixels
-				// that the current byte represents.
-				// (7 - i) calculates the position of a specific pixel within the 8-pixel group.
-				// (7 - i) inverts the bit order so that most significant bit (7) is the leftmost pixel and least (0)
-				// is the rightmost pixel.
-
-				int pixelIndexInRow = x * 8 + (7 - i);
-				int pixelIndex = y * IMAGE_WIDTH + pixelIndexInRow;
-				pixels[pixelIndex] = color;
-			}
-		}
-	}
 	
-	SDL_UpdateTexture(texture, NULL, pixels, IMAGE_WIDTH * sizeof(uint32_t));
-	
+	loadImage(files[currentImageIndex], pixels);
+
 	applicationIsRunning = 1;
 
 	while (applicationIsRunning)
 	{
-		handleInput();
+		handleInput(files, pixels);
 		update();
 		render();
 	}
 
-	free(buffer);
+	for (int i = 0; i < fileCount; i++)
+	{
+		if (!files)
+		{
+			free(files[i]->data);
+			free(files[i]);
+		}
+	}
+
 	free(pixels);
+	free(files);
 
 	SDL_DestroyTexture(texture);
 	shutdownSDL();
