@@ -63,3 +63,5 @@
 #define THE_END_B "the_end.b"
 #define THE_END_O "the_end.o"
 #define THE_END_OB "the_end.ob"
+
+extern const char** getFilenames(int* count);
