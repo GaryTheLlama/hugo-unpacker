@@ -5,11 +5,13 @@
 #define TITLE "Hugo Unpacker"
 #define VERSION 0.3
 
-#define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 400
+#define WINDOW_WIDTH 1280
+#define WINDOW_HEIGHT 800
 
 #define IMAGE_WIDTH 320
 #define IMAGE_HEIGHT 200
+
+#define ASSET_SCALE_FACTOR 2
 
 #define STRINGIFY(x) #x
 #define GET_TITLE(x, y) x " " STRINGIFY(y)

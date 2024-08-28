@@ -18,6 +18,7 @@ uint32_t totalFileCount = 0;
 static SDL_Window* window = NULL;
 static SDL_Renderer* renderer = NULL;
 static SDL_Texture* texture = NULL;
+static SDL_Rect* imageSizeRect = NULL;
 
 typedef struct {
 	char* filename;
@@ -251,7 +252,7 @@ static void render(void)
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 	SDL_RenderClear(renderer);
 
-	SDL_RenderCopy(renderer, texture, NULL, NULL);
+	SDL_RenderCopy(renderer, texture, NULL, imageSizeRect);
 
 	SDL_RenderPresent(renderer);
 }
@@ -365,6 +366,23 @@ int main(int argc, char* argv[])
 	
 	loadImage(files[currentImageIndex], pixels);
 
+	// Calculate rect for image size.
+	imageSizeRect = (SDL_Rect*)malloc(sizeof(SDL_Rect));
+
+	if (!imageSizeRect)
+	{
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Memory allocation failed: %s\n", SDL_GetError());
+		showError(window, "Error", "Memory allocation failed.\n%s\n", SDL_GetError());
+		free(pixels);
+		shutdownSDL();
+		return EXIT_FAILURE;
+	}
+
+	imageSizeRect->w = IMAGE_WIDTH * ASSET_SCALE_FACTOR;
+	imageSizeRect->h = IMAGE_HEIGHT * ASSET_SCALE_FACTOR;
+	imageSizeRect->x = (WINDOW_WIDTH - (IMAGE_WIDTH * 2)) / 2;
+	imageSizeRect->y = (WINDOW_HEIGHT - (IMAGE_HEIGHT * 2)) / 2;
+
 	applicationIsRunning = 1;
 
 	while (applicationIsRunning)
@@ -385,6 +403,7 @@ int main(int argc, char* argv[])
 
 	free(pixels);
 	free(files);
+	free(imageSizeRect);
 
 	SDL_DestroyTexture(texture);
 	shutdownSDL();
